@@ -107,11 +107,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const login = async (): Promise<void> => {};
+  const login = async (): Promise<void> => {
+    try {
+      // Ask the Chat component to open its login popup
+      window.dispatchEvent(new CustomEvent('openLoginPopup'))
+    } catch (e) {
+      console.error('[AuthProvider] login: failed to dispatch login popup event', e)
+    }
+  };
 
   const handleLoginSuccess = async (userData: User, token: string) => {
     setUser(userData);
     setIsAuthenticated(true);
+    // Store token for future requests
+    try {
+      await chrome.storage.local.set({ token, user: userData, timestamp: Date.now() })
+    } catch {}
     
     // Create session object
     const newSession: Session = {
@@ -130,8 +141,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(null);
       setSession(null);
       setIsAuthenticated(false);
-      
-      
+      // Inform background to clear its in-memory token as well
+      try {
+        await new Promise<void>((resolve) => {
+          (chrome.runtime.sendMessage as any)({ action: 'logout' }, () => resolve())
+        })
+      } catch {}
     } catch (error) {
       console.error('[AuthProvider] logout: Error during logout:', error);
     }

@@ -86,11 +86,27 @@ pnpm dev
 pnpm build
 ```
 
+### Load the Chrome Extension
+1. Run `pnpm build` to generate the `dist/` folder.
+2. Open Chrome and go to `chrome://extensions`.
+3. Enable Developer mode (top-right toggle).
+4. Click "Load unpacked" and select the `dist/` folder.
+5. You should now see "LeetCode Whisper" installed.
+
+### Open the Chat Box
+- Popup: Click the extension icon in the Chrome toolbar; the popup loads `index.html` with the chat UI.
+- Side Panel: On any tab, click the gear icon in the on-page widget on LeetCode, or open the side panel via the extension action.
+- On-page Widget: Visit any LeetCode problem page (`https://leetcode.com/problems/*`) and click the bot button that appears at the bottom-right to toggle the on-page chat.
+
+If nothing appears on LeetCode pages, make sure the extension has access to `leetcode.com` (click the extension’s Details > Site access) and that you are on a problem page path.
+
 ### Environment Variables
 Create a `.env` file with:
 ```env
 VITE_BACKEND_API_BASE_URL=http://localhost:3001/api
 ```
+
+If your backend runs on a different host or port, update the value accordingly. The extension background and UI will use this base.
 
 ## Chat History Implementation
 

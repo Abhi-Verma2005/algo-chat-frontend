@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select'
 import Chat from '@/components/Chat'
 import { LeetCodeAdapter } from './platforms/leetcode'
+import { CodeChefAdapter } from './platforms/codechef'
 
 interface ChatBoxProps {
   visible: boolean
@@ -81,13 +82,23 @@ const ContentPage: React.FC = () => {
       document.removeEventListener('click', handleDocumentClick)
     }
   }, [])
-  ;(async () => {
-    const { getKeyModel, selectModel } = useChromeStorage()
-    const { model, apiKey } = await getKeyModel(await selectModel())
-
-    setModal(model)
-    setApiKey(apiKey)
-  })()
+  // Load model and key once mounted
+  React.useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      try {
+        const { getKeyModel, selectModel } = useChromeStorage()
+        const selected = await selectModel()
+        const { model, apiKey } = await getKeyModel(selected)
+        if (!cancelled) {
+          setModal(model)
+          setApiKey(apiKey)
+        }
+      } catch {}
+    }
+    load()
+    return () => { cancelled = true }
+  }, [])
 
   const heandelModel = (v: ValidModel) => {
     if (v) {
@@ -98,16 +109,21 @@ const ContentPage: React.FC = () => {
   }
 
   React.useEffect(() => {
-    const adapter = new LeetCodeAdapter()
-    if (!adapter.isOnProblemPage()) return
+    const hostname = window.location.hostname
+    const isLeetCode = hostname.includes('leetcode.com')
+    const isCodeChef = hostname.includes('codechef.com')
+    const adapter = isLeetCode ? new LeetCodeAdapter() : isCodeChef ? new CodeChefAdapter() : null
+    if (!adapter || !adapter.isOnProblemPage()) return
+
+    const platformKey = isLeetCode ? 'leetcode' : 'codechef'
 
     const updateCodeSnapshot = async () => {
       try {
         const snap = await adapter.snapshotCodeAndMeta()
         setCurrentCode(snap.code)
         await chrome.storage.local.set({
-          __leetcode_code_snapshot__: snap.code,
-          __leetcode_problem_meta__: {
+          [`__${platformKey}_code_snapshot__`]: snap.code,
+          [`__${platformKey}_problem_meta__`]: {
             slug: snap.slug,
             language: snap.language,
             title: snap.title,
@@ -123,15 +139,15 @@ const ContentPage: React.FC = () => {
       isProcessingRef.current = true
       try {
         setCurrentCode(payload.code)
-        const authStored = await chrome.storage.local.get(['authToken'])
-        const token = authStored?.authToken
+        const authStored = await chrome.storage.local.get(['token'])
+        const token = authStored?.token
         if (!token) return
         await new Promise((resolve, reject) => {
           ;(chrome as any).runtime.sendMessage(
             {
               action: 'send_to_backend',
               data: payload,
-              authToken: token,
+              token,
             },
             undefined,
             (response: any) => {

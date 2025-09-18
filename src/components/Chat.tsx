@@ -103,14 +103,17 @@ function Chat({
 
   // Load existing chat from database
   const loadExistingChat = async (chatIdToLoad: string) => {
-    if (!user) return;
     
     setIsLoadingChat(true);
     try {
       const stored = await chrome.storage.local.get(['token']);
       const token = stored.token;
       
-      if (!token) return;
+      if (!token) {
+        toast.error('Please login to load chats');
+        window.dispatchEvent(new CustomEvent('openLoginPopup'));
+        return;
+      }
       
       
       
@@ -120,6 +123,12 @@ function Chat({
         },
       });
       
+      if (response.status === 401) {
+        toast.error('Session expired. Please login again.');
+        window.dispatchEvent(new CustomEvent('openLoginPopup'));
+        return;
+      }
+
       if (response.ok) {
         const data = await response.json();
         
@@ -172,6 +181,7 @@ function Chat({
 
   // Listen for new chat event
   useEffect(() => {
+    const openLogin = () => setShowLoginPopup(true)
     const handleNewChat = async () => {
       
       
@@ -207,10 +217,12 @@ function Chat({
     };
 
     window.addEventListener('newChat', handleNewChat);
+    window.addEventListener('openLoginPopup', openLogin);
     window.addEventListener('loadChat', handleLoadChat as EventListener);
     
     return () => {
       window.removeEventListener('newChat', handleNewChat);
+      window.removeEventListener('openLoginPopup', openLogin);
       window.removeEventListener('loadChat', handleLoadChat as EventListener);
     };
   }, [chatId, messages, user]);
@@ -436,7 +448,7 @@ function Chat({
         <div className="flex flex-col justify-between items-center gap-4 h-full">
           <div
             ref={messagesContainerRef}
-            className="flex flex-col gap-4 h-full w-full items-center overflow-y-auto px-4 md:px-0"
+            className="flex flex-col gap-4 h-full w-full items-center overflow-y-auto px-4 md:px-0 mt-4"
           >
             {isLoadingChat || isSavingChat || isCreatingNewChat ? (
               <div className="flex items-center justify-center p-8">
@@ -451,10 +463,12 @@ function Chat({
               <Overview />
             ) : (
               <>
-                {/* Debug info */}
-                <div className="text-xs text-gray-500 mb-2">
-                  Debug: {chatMessages.length} messages, Chat ID: {chatId}
-                </div>
+                {/* Debug info (dev only) */}
+                {import.meta.env.DEV && (
+                  <div className="text-xs text-gray-500 mb-2">
+                    Debug: {chatMessages.length} messages, Chat ID: {chatId}
+                  </div>
+                )}
                 
                 {chatMessages
                   .map((message, idx) => validateMessage(message, idx))

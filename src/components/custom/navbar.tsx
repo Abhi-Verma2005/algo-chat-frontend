@@ -64,16 +64,16 @@ export const Navbar = () => {
           <Link to="/">
             <div className="flex flex-row gap-2 items-center">
               <img
-                src="/images/gemini-logo.png"
+                src={chrome.runtime?.getURL ? chrome.runtime.getURL('vite.svg') : '/vite.svg'}
                 height={20}
                 width={20}
-                alt="gemini logo"
+                alt="Algo Chat"
               />
               <div className="text-zinc-400">
                 <SlashIcon size={16} />
               </div>
               <div className="text-sm text-white font-semibold truncate w-28 md:w-fit">
-                Odin AI
+                Algo Chat
               </div>
             </div>
           </Link>

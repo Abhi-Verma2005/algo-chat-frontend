@@ -1,43 +1,65 @@
 // Handle side panel setup
+console.log('[background] init: setting side panel behavior');
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
 // Store authentication state
 let authToken = null;
 let currentUser = null;
-const BACKEND_API_BASE = 'http://localhost:3001';
+// Use unified API base with /api prefix for consistency
+const BACKEND_API_BASE = 'http://localhost:3001/api';
 
 // Unified message handler (auth + submissions)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('[background] onMessage:', message?.action, { fromTabId: sender?.tab?.id });
   if (message.action === 'openPopup') {
+    console.log('[background] action: openPopup');
     chrome.action.openPopup(); // Opens the popup programmatically
   }
   
   if (message.action === 'openSidePanel') {
-    chrome.sidePanel.open(); // Opens the side panel
+    console.log('[background] action: openSidePanel');
+    // Open side panel for the active tab
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tab = tabs?.[0];
+      if (tab && tab.id) {
+        chrome.sidePanel.open({ tabId: tab.id });
+      } else {
+        // fallback
+        chrome.sidePanel.open();
+      }
+    });
   }
   
   if (message.action === 'toggleSidePanel') {
-    chrome.sidePanel.getOptions({}).then((options) => {
-      if (options.enabled) {
-        chrome.sidePanel.close()
-      } else {
-        chrome.sidePanel.open()
-      }
-    })
+    console.log('[background] action: toggleSidePanel');
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tab = tabs?.[0];
+      if (!tab || !tab.id) return;
+      chrome.sidePanel.getOptions({ tabId: tab.id }).then((options) => {
+        if (options && options.enabled) {
+          chrome.sidePanel.close({ tabId: tab.id });
+        } else {
+          chrome.sidePanel.open({ tabId: tab.id });
+        }
+      });
+    });
   }
 
   // Handle authentication
   if (message.action === 'login') {
+    console.log('[background] action: login');
     handleLogin(message.credentials, sendResponse);
     return true; // Keep message channel open for async response
   }
 
   if (message.action === 'logout') {
+    console.log('[background] action: logout');
     handleLogout(sendResponse);
     return true;
   }
 
   if (message.action === 'getAuthState') {
+    console.log('[background] action: getAuthState');
     sendResponse({ 
       isAuthenticated: !!authToken, 
       user: currentUser 
@@ -45,12 +67,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === 'verifyToken') {
+    console.log('[background] action: verifyToken');
     verifyToken(sendResponse);
     return true;
   }
 
   // Submission relay from content script
   if (message.action === 'send_to_backend') {
+    console.log('[background] action: send_to_backend');
     handleSubmitToBackend(message, sendResponse);
     return true;
   }
@@ -59,7 +83,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // Handle login
 async function handleLogin(credentials, sendResponse) {
   try {
-    const response = await fetch(`${BACKEND_API_BASE}/auth/login`, {
+    console.log('[background] handleLogin: start');
+  const response = await fetch(`${BACKEND_API_BASE}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -67,16 +92,19 @@ async function handleLogin(credentials, sendResponse) {
       body: JSON.stringify(credentials),
     });
 
+    console.log('[background] handleLogin: response status', response.status);
     const data = await response.json();
 
     if (data.success) {
+      console.log('[background] handleLogin: success for user', data?.data?.user?.email || data?.data?.user?.id);
       authToken = data.data.token;
       currentUser = data.data.user;
       
-      // Store token in chrome storage
+      // Store token in chrome storage (unified key: token)
       chrome.storage.local.set({ 
-        authToken: authToken,
-        user: currentUser 
+        token: authToken,
+        user: currentUser,
+        timestamp: Date.now()
       });
 
       sendResponse({ 
@@ -85,13 +113,14 @@ async function handleLogin(credentials, sendResponse) {
         user: currentUser 
       });
     } else {
+      console.warn('[background] handleLogin: failed', data?.message);
       sendResponse({ 
         success: false, 
         message: data.message || 'Login failed' 
       });
     }
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('[background] handleLogin: error', error);
     sendResponse({ 
       success: false, 
       message: 'Network error during login' 
@@ -102,18 +131,19 @@ async function handleLogin(credentials, sendResponse) {
 // Handle logout
 async function handleLogout(sendResponse) {
   try {
+    console.log('[background] handleLogout: clearing session');
     authToken = null;
     currentUser = null;
     
     // Clear stored data
-    chrome.storage.local.remove(['authToken', 'user']);
+  chrome.storage.local.remove(['token', 'user', 'timestamp']);
     
     sendResponse({ 
       success: true, 
       message: 'Logout successful' 
     });
   } catch (error) {
-    console.error('Logout error:', error);
+    console.error('[background] handleLogout: error', error);
     sendResponse({ 
       success: false, 
       message: 'Error during logout' 
@@ -123,7 +153,9 @@ async function handleLogout(sendResponse) {
 
 // Verify token validity
 async function verifyToken(sendResponse) {
+  console.log('[background] verifyToken: start');
   if (!authToken) {
+    console.warn('[background] verifyToken: no token');
     sendResponse({ 
       success: false, 
       message: 'No token found' 
@@ -139,12 +171,14 @@ async function verifyToken(sendResponse) {
       },
     });
 
+    console.log('[background] verifyToken: response status', response.status);
     const data = await response.json();
 
     if (data.success) {
       // Update user data
-      currentUser = data.data.user;
-      chrome.storage.local.set({ user: currentUser });
+  currentUser = data.data.user;
+  chrome.storage.local.set({ user: currentUser, timestamp: Date.now() });
+      console.log('[background] verifyToken: success');
       
       sendResponse({ 
         success: true, 
@@ -153,9 +187,10 @@ async function verifyToken(sendResponse) {
       });
     } else {
       // Token is invalid, clear it
+      console.warn('[background] verifyToken: invalid token');
       authToken = null;
       currentUser = null;
-      chrome.storage.local.remove(['authToken', 'user']);
+  chrome.storage.local.remove(['token', 'user', 'timestamp']);
       
       sendResponse({ 
         success: false, 
@@ -163,7 +198,7 @@ async function verifyToken(sendResponse) {
       });
     }
   } catch (error) {
-    console.error('Token verification error:', error);
+    console.error('[background] verifyToken: error', error);
     sendResponse({ 
       success: false, 
       message: 'Network error during token verification' 
@@ -173,28 +208,32 @@ async function verifyToken(sendResponse) {
 
 // Restore authentication state on startup
 chrome.runtime.onStartup.addListener(async () => {
+  console.log('[background] onStartup: restore session');
   try {
-    const result = await chrome.storage.local.get(['authToken', 'user']);
-    if (result.authToken && result.user) {
-      authToken = result.authToken;
+    const result = await chrome.storage.local.get(['token', 'user']);
+    if (result.token && result.user) {
+      authToken = result.token;
       currentUser = result.user;
       
       // Verify token is still valid
+      console.log('[background] onStartup: verifying restored token');
       verifyToken(() => {});
     }
   } catch (error) {
-    console.error('Error restoring auth state:', error);
+    console.error('[background] onStartup: restore error', error);
   }
 });
 
 // Set up side panel when extension is installed
 chrome.runtime.onInstalled.addListener(() => {
+  console.log('[background] onInstalled: init');
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
   
   // Check for stored authentication
-  chrome.storage.local.get(['authToken', 'user'], (result) => {
-    if (result.authToken && result.user) {
-      authToken = result.authToken;
+  chrome.storage.local.get(['token', 'user'], (result) => {
+    if (result.token && result.user) {
+      console.log('[background] onInstalled: found stored session');
+      authToken = result.token;
       currentUser = result.user;
     }
   });
@@ -203,19 +242,22 @@ chrome.runtime.onInstalled.addListener(() => {
 // Relay to backend submissions endpoint with retry and status storage
 async function handleSubmitToBackend(message, sendResponse) {
   try {
-    const { data, authToken: tokenFromContent } = message;
+    console.log('[background] handleSubmitToBackend: start');
+    const { data, token: tokenFromContent } = message;
     const token = tokenFromContent || authToken;
     if (!token) {
+      console.warn('[background] handleSubmitToBackend: no token');
       sendResponse({ error: 'No auth token found' });
       return;
     }
 
-    const backendUrl = `${BACKEND_API_BASE}/api/submissions`;
+    const backendUrl = `${BACKEND_API_BASE}/submissions`;
     const maxRetries = 3;
     const baseDelay = 800;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
+        console.log('[background] handleSubmitToBackend: attempt', attempt);
         const resp = await fetch(backendUrl, {
           method: 'POST',
           headers: {
@@ -231,9 +273,11 @@ async function handleSubmitToBackend(message, sendResponse) {
           })
         });
 
+        console.log('[background] handleSubmitToBackend: status', resp.status);
         if (!resp.ok) {
           const text = await resp.text();
           if (attempt === maxRetries) {
+            console.error('[background] handleSubmitToBackend: failed after retries', resp.status, text);
             sendResponse({ error: `HTTP ${resp.status}: ${text}` });
             return;
           }
@@ -242,6 +286,7 @@ async function handleSubmitToBackend(message, sendResponse) {
         }
 
         const result = await resp.json();
+        console.log('[background] handleSubmitToBackend: success');
 
         // update local stats
         const stored = await chrome.storage.local.get(null);
@@ -255,6 +300,7 @@ async function handleSubmitToBackend(message, sendResponse) {
         sendResponse({ success: true, data: result?.data || result });
         return;
       } catch (err) {
+        console.warn('[background] handleSubmitToBackend: network error on attempt', attempt, err);
         if (attempt === maxRetries) {
           sendResponse({ error: err?.message || 'Network error' });
           return;
@@ -263,6 +309,7 @@ async function handleSubmitToBackend(message, sendResponse) {
       }
     }
   } catch (error) {
+    console.error('[background] handleSubmitToBackend: unexpected error', error);
     sendResponse({ error: error?.message || 'Unknown error' });
   }
 }

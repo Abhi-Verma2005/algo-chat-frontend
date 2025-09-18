@@ -318,7 +318,7 @@ export function MultimodalInput({
         placeholder="Send a message..."
         value={input}
         onChange={handleInput}
-          className="min-h-[72px] max-h-[200px] overflow-hidden resize-none rounded-2xl text-base bg-[#23272e] border border-[#2d3138] text-white placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 shadow-lg backdrop-blur-sm"
+          className="min-h-[72px] max-h-[200px] overflow-y-auto resize-none rounded-2xl text-base bg-[#23272e] border border-[#2d3138] text-white placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 shadow-lg backdrop-blur-sm"
         rows={3}
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey) {

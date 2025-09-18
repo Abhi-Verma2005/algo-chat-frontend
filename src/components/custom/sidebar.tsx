@@ -40,16 +40,14 @@ export function Sidebar() {
   }, [content]);
 
   const fetchChatHistory = async () => {
-    if (!user) {
-      return;
-    }
-    
     setIsLoading(true);
     try {
       const stored = await chrome.storage.local.get(['token']);
       const token = stored.token;
       
       if (!token) {
+        setChats([]);
+        setIsLoading(false);
         return;
       }
       
@@ -59,6 +57,14 @@ export function Sidebar() {
         },
       });
       
+      if (response.status === 401) {
+        // Unauthorized: prompt login
+        window.dispatchEvent(new CustomEvent('openLoginPopup'));
+        setChats([]);
+        setIsLoading(false);
+        return;
+      }
+
       if (response.ok) {
         const data = await response.json();
         
@@ -98,7 +104,6 @@ export function Sidebar() {
   };
 
   const deleteChat = async (chatId: string) => {
-    if (!user) return;
     
     try {
       const stored = await chrome.storage.local.get(['token']);
@@ -190,10 +195,10 @@ export function Sidebar() {
   };
 
   useEffect(() => {
-    if (isOpen && user && !showToolContent) {
+    if (isOpen && !showToolContent) {
       fetchChatHistory();
     }
-  }, [isOpen, user, showToolContent]);
+  }, [isOpen, showToolContent]);
 
   // Listen for chat saved events to refresh history
   useEffect(() => {
@@ -283,10 +288,10 @@ export function Sidebar() {
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto">
               {showToolContent ? (
                 // Tool Content Display
-                <div className="h-full overflow-y-auto p-4">
+                <div className="h-full overflow-hidden p-4">
                   {content}
                 </div>
               ) : (

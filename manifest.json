@@ -3,7 +3,7 @@
   "name": "LeetCode Whisper",
   "version": "1.0.0",
   "description": "Chrome extension providing AI-driven hints on LeetCode problems. Get step-by-step help to boost problem-solving skills effectively.",
-  "permissions": ["storage", "sidePanel", "activeTab", "scripting"],
+  "permissions": ["storage", "sidePanel", "activeTab", "scripting", "tabs"],
   "action": {
     "default_popup": "index.html"
   },
@@ -20,16 +20,31 @@
   "content_scripts": [
     {
       "js": ["src/content.tsx"],
-      "matches": ["https://leetcode.com/problems/*"]
+      "matches": [
+        "https://leetcode.com/problems/*",
+        "https://www.codechef.com/*/problems/*",
+        "https://www.codechef.com/*/submit/*",
+        "https://www.codechef.com/practice/*"
+      ]
     }
   ],
   "background": {
     "service_worker": "src/background.js"
   },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "assets/*",
+        "index.html"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "host_permissions": [
     "http://localhost:3000/*",
     "http://localhost:3001/*",
     "https://leetcode.com/*",
+    "https://www.codechef.com/*",
     "https://algo-chat-gamma.vercel.app/*"
   ]
 }
