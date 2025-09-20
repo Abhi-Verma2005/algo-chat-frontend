@@ -58,6 +58,13 @@ const quickActions = [
     color: "text-fuchsia-200 hover:bg-fuchsia-900/40 focus:bg-fuchsia-900/40"
   },
   {
+    title: "CodeChef question",
+    label: "platform-specific prompt",
+    action: "Get a CodeChef practice question. Use the getPlatformQuestions tool with platform='codechef' and limit=1. Return only slug and url via tool result.",
+    icon: Search,
+    color: "text-orange-200 hover:bg-orange-900/40 focus:bg-orange-900/40"
+  },
+  {
     title: "Show progress",
     label: "DSA learning progress",
     action: "Show my DSA progress.",
@@ -163,14 +170,50 @@ export function MultimodalInput({
   const submitForm = useCallback(() => {
     // Automatically include current LeetCode code context if available
     try {
-      const contextPrefixKey = '__leetcode_current_code_ctx__';
+  // Gathering context from chrome storage for LeetCode/CodeChef
       const withContext = async () => {
         try {
-          const stored = await chrome.storage.local.get(['__leetcode_code_snapshot__', '__leetcode_problem_meta__']);
-          const code = stored?.__leetcode_code_snapshot__;
-          const meta = stored?.__leetcode_problem_meta__;
-          if (code && typeof code === 'string' && code.trim().length > 0) {
-            const header = `Context (do not repeat verbatim):\nProblem: ${meta?.title || meta?.slug || 'Unknown'}\nSlug: ${meta?.slug || ''}\nLanguage: ${meta?.language || ''}\n---\n${code}\n---\n`;
+          const stored = await chrome.storage.local.get([
+            '__leetcode_code_snapshot__',
+            '__leetcode_problem_meta__',
+            '__codechef_code_snapshot__',
+            '__codechef_problem_meta__',
+          ]);
+
+          // Prefer platform based on hostname, fallback to whichever exists
+          const host = window?.location?.hostname || '';
+          const isLC = /leetcode\.com$/i.test(host);
+          const isCC = /codechef\.com$/i.test(host);
+
+          const lcCode = stored?.__leetcode_code_snapshot__ as string | undefined;
+          const lcMeta = stored?.__leetcode_problem_meta__ as any;
+          const ccCode = stored?.__codechef_code_snapshot__ as string | undefined;
+          const ccMeta = stored?.__codechef_problem_meta__ as any;
+
+          let chosenCode: string | undefined;
+          let chosenMeta: any;
+          let chosenPlatform = '';
+
+          if (isLC && lcCode) {
+            chosenCode = lcCode;
+            chosenMeta = lcMeta;
+            chosenPlatform = 'LeetCode';
+          } else if (isCC && ccCode) {
+            chosenCode = ccCode;
+            chosenMeta = ccMeta;
+            chosenPlatform = 'CodeChef';
+          } else if (lcCode) {
+            chosenCode = lcCode;
+            chosenMeta = lcMeta;
+            chosenPlatform = 'LeetCode';
+          } else if (ccCode) {
+            chosenCode = ccCode;
+            chosenMeta = ccMeta;
+            chosenPlatform = 'CodeChef';
+          }
+
+          if (chosenCode && typeof chosenCode === 'string' && chosenCode.trim().length > 0) {
+            const header = `Context (do not repeat verbatim):\nPlatform: ${chosenPlatform}\nProblem: ${chosenMeta?.title || chosenMeta?.slug || 'Unknown'}\nSlug: ${chosenMeta?.slug || ''}\nLanguage: ${chosenMeta?.language || ''}\n---\n${chosenCode}\n---\n`;
             if (input && !input.includes(header)) {
               setInput(`${header}${input}`);
             }
@@ -196,7 +239,7 @@ export function MultimodalInput({
 
   const uploadFile = async (file: File) => {
     const formData = new FormData();
-    formData.append("file", file);
+  formData.append("file", file);
 
     try {
       const API_BASE_URL = (import.meta as any).env?.VITE_BACKEND_API_BASE_URL || 'http://localhost:3001/api';
