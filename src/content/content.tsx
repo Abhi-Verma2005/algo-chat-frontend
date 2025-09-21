@@ -135,13 +135,17 @@ const ContentPage: React.FC = () => {
     updateCodeSnapshot()
 
     const disconnect = adapter.detectAccepted(async (payload) => {
+      try { console.log('[Content] Accepted detected, preparing to relay', { slug: payload?.slug, lang: payload?.language, codeLen: payload?.code?.length || 0 }) } catch {}
       if (isProcessingRef.current) return
       isProcessingRef.current = true
       try {
         setCurrentCode(payload.code)
         const authStored = await chrome.storage.local.get(['token'])
         const token = authStored?.token
-        if (!token) return
+        if (!token) {
+          try { console.warn('[Content] Missing auth token, cannot send submission for', payload?.slug) } catch {}
+          return
+        }
         await new Promise((resolve, reject) => {
           ;(chrome as any).runtime.sendMessage(
             {
@@ -151,6 +155,7 @@ const ContentPage: React.FC = () => {
             },
             undefined,
             (response: any) => {
+              try { console.log('[Content] Relay response', response) } catch {}
               if ((chrome as any).runtime.lastError) {
                 reject(new Error((chrome as any).runtime.lastError.message))
               } else if (response?.error) {
@@ -162,6 +167,7 @@ const ContentPage: React.FC = () => {
           )
         })
       } catch (e) {
+        try { console.error('[Content] Submission relay failed:', e) } catch {}
       } finally {
         setTimeout(() => {
           isProcessingRef.current = false

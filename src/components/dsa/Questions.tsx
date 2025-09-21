@@ -1,15 +1,23 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
   CheckCircle, 
   ExternalLink, 
   Bookmark, 
   Code, 
   Trophy, 
-  Filter,
   ChevronDown,
   ChevronUp 
 } from 'lucide-react';
 import { Button } from '../ui/button';
+
+// Fallback URL guesser when no explicit platform URL is provided
+const guessSolveUrl = (slug?: string) => {
+  if (!slug) return undefined;
+  const looksLikeLeetCode = /^[a-z0-9-]+$/.test(slug) && slug.includes('-');
+  return looksLikeLeetCode
+    ? `https://leetcode.com/problems/${slug}/`
+    : `https://www.codechef.com/problems/${slug}`;
+};
 
 // Sample data structure
 const SAMPLE_DATA = {
@@ -73,7 +81,9 @@ interface Question {
   slug: string;
   difficulty: 'BEGINNER' | 'EASY' | 'MEDIUM' | 'HARD' | 'VERYHARD';
   points: number;
-  leetcodeUrl: string;
+  questionUrl?: string; // canonical URL from DB
+  leetcodeUrl?: string;
+  url?: string; // generic platform url (e.g., CodeChef)
   isSolved: boolean;
   isBookmarked: boolean;
   questionTags: QuestionTag[];
@@ -119,8 +129,16 @@ interface QuestionCardProps {
 
 const QuestionCard = ({ question, onDone, onCheck }: QuestionCardProps) => {
   const [showTags, setShowTags] = useState(false);
-  const [bookmarked, setBookmarked] = useState(question.isBookmarked);
+  const [bookmarked, setBookmarked] = useState(!!question.isBookmarked);
   const [showHint, setShowHint] = useState(false);
+  const solveUrl =
+    question.questionUrl ||
+    question.url ||
+    // Prefer a guessed platform URL before falling back to leetcodeUrl
+    guessSolveUrl(question.slug) ||
+    question.leetcodeUrl;
+  const points = typeof question.points === 'number' ? question.points : 0;
+  const difficulty = (question.difficulty || 'EASY') as Question['difficulty'];
 
   return (
     <div className="bg-[#181A20]/90 backdrop-blur-md border border-[#23272e] rounded-2xl p-5 shadow-xl transition-all duration-200 hover:scale-[1.02] hover:shadow-2xl">
@@ -144,11 +162,11 @@ const QuestionCard = ({ question, onDone, onCheck }: QuestionCardProps) => {
           </h4>
 
           <div className="flex items-center gap-2 mb-3">
-            <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getDifficultyColor(question.difficulty)} shadow-sm`}> 
-              {getDifficultyIcon(question.difficulty)} {question.difficulty}
+            <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getDifficultyColor(difficulty)} shadow-sm`} > 
+              {getDifficultyIcon(difficulty)} {difficulty}
             </span>
             <span className="text-xs font-bold text-green-400 bg-green-900/30 px-2 py-0.5 rounded-full">
-              +{question.points} pts
+              +{points} pts
             </span>
           </div>
 
@@ -178,23 +196,21 @@ const QuestionCard = ({ question, onDone, onCheck }: QuestionCardProps) => {
             >
               Hint
             </Button>
-            <a
-              href={question.leetcodeUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Button
-                size="sm"
-                variant="default"
-                className="text-xs h-8 px-3 rounded-full flex items-center gap-1 border-green-700 text-green-300 bg-green-900/20 hover:bg-green-900/40 hover:text-white"
-                asChild
-              >
-                <span>
-                  Solve
-                  <ExternalLink className="size-3 inline ml-1" />
-                </span>
-              </Button>
-            </a>
+            {solveUrl && (
+              <a href={solveUrl} target="_blank" rel="noopener noreferrer">
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="text-xs h-8 px-3 rounded-full flex items-center gap-1 border-green-700 text-green-300 bg-green-900/20 hover:bg-green-900/40 hover:text-white"
+                  asChild
+                >
+                  <span>
+                    Solve
+                    <ExternalLink className="size-3 inline ml-1" />
+                  </span>
+                </Button>
+              </a>
+            )}
           </div>
 
           {/* Quick Hint Tooltip/Box */}
@@ -216,7 +232,7 @@ const QuestionCard = ({ question, onDone, onCheck }: QuestionCardProps) => {
 
           {showTags && (
             <div className="flex flex-wrap gap-2 mt-2">
-              {question.questionTags.map((tag, index) => (
+              {(question.questionTags || []).map((tag, index) => (
                 <span
                   key={index}
                   className="px-2 py-1 bg-[#23272e] text-blue-300 rounded-full text-xs border border-blue-800 shadow-sm"

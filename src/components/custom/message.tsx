@@ -181,64 +181,46 @@ export const Message = ({
           </div>
         );
         break;
-      case "getPlatformQuestions": {
-        const toTitle = (slug: string) => slug?.replace(/[-_]/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()) || 'Question';
-        component = (
-          <div className="max-w-md mx-auto bg-background border border-border rounded-xl p-4 space-y-4 shadow-lg">
-            <div className="text-center space-y-2">
-              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-600 text-white rounded-full flex items-center justify-center mx-auto">
-                <span className="text-2xl">🏁</span>
-              </div>
-              <h3 className="text-lg font-bold text-foreground">Platform Questions</h3>
-              <p className="text-sm text-muted-foreground">Slug and URL only</p>
-            </div>
-            <div className="space-y-2 max-h-72 overflow-y-auto">
-              {Array.isArray(result) && result.slice(0, 10).map((q: any, index: number) => {
-                const slug = q.slug || '';
-                const title = toTitle(slug);
-                return (
-                  <div key={index} className="bg-card rounded-lg p-3 border border-border">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold text-foreground truncate" title={title}>{title}</div>
-                        <div className="text-xs text-muted-foreground break-all">{slug}</div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {/* Solve */}
-                        {q.url && (
-                          <a
-                            href={q.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-2 py-1 rounded-full text-xs border-green-700 text-green-300 bg-green-900/20 hover:bg-green-900/40 hover:text-white"
-                          >
-                            Solve
-                          </a>
-                        )}
-                        {/* Check */}
-                        <button
-                          onClick={() => handleCheck({ title, slug })}
-                          className="px-2 py-1 rounded-full text-xs border-sky-700 text-sky-300 bg-sky-900/20 hover:bg-sky-900/40 hover:text-white"
-                        >
-                          Check
-                        </button>
-                        {/* Done */}
-                        <button
-                          onClick={() => handleDone({ title, slug })}
-                          className="px-2 py-1 rounded-full text-xs border-fuchsia-700 text-fuchsia-300 bg-fuchsia-900/20 hover:bg-fuchsia-900/40 hover:text-white"
-                        >
-                          Done
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
+      case "getPlatformQuestions":
+        {
+          const toTitle = (slug: string) => slug?.replace(/[-_]/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()) || 'Question';
+          const normalized = Array.isArray(result)
+            ? {
+                questionsWithSolvedStatus: result.map((q: any, i: number) => {
+                  const slug = q.slug || `question-${i + 1}`;
+                  const title = q.title || toTitle(slug);
+                  const platform = (q.platform || '').toString().toLowerCase();
+                  // Prefer DB questionUrl, then generic url, then platform-based guess
+                  const codechefGuess = `https://www.codechef.com/problems/${slug}`;
+                  const guessedUrl = platform.includes('codechef') ? codechefGuess : undefined;
+                  return {
+                    id: q.id || String(i + 1),
+                    title,
+                    slug,
+                    difficulty: (q.difficulty || 'EASY') as any,
+                    points: typeof q.points === 'number' ? q.points : 0,
+                    questionUrl: q.questionUrl,
+                    url: q.url || q.questionUrl || guessedUrl,
+                    leetcodeUrl: q.leetcodeUrl,
+                    isSolved: !!q.isSolved,
+                    isBookmarked: !!q.isBookmarked,
+                    questionTags: Array.isArray(q.questionTags) ? q.questionTags : [],
+                  };
+                }),
+                individualPoints: 0,
+                totalCount: result.length,
+              }
+            : result;
+
+          component = (
+            <CompactQuestionsViewer 
+              data={normalized}
+              onDone={handleDone}
+              onCheck={handleCheck}
+            />
+          );
+        }
         break;
-      }
         break;
       default:
         component = (

@@ -22,9 +22,13 @@
       "js": ["src/content.tsx"],
       "matches": [
         "https://leetcode.com/problems/*",
+        "https://www.codechef.com/problems/*",
+        "https://www.codechef.com/submit/*",
         "https://www.codechef.com/*/problems/*",
         "https://www.codechef.com/*/submit/*",
         "https://www.codechef.com/practice/*",
+        "https://codechef.com/problems/*",
+        "https://codechef.com/submit/*",
         "https://codechef.com/*/problems/*",
         "https://codechef.com/*/submit/*",
         "https://codechef.com/practice/*"

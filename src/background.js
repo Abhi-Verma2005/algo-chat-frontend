@@ -74,7 +74,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // Submission relay from content script
   if (message.action === 'send_to_backend') {
-    console.log('[background] action: send_to_backend');
+    try { console.log('[background] action: send_to_backend', { slug: message?.data?.slug, status: message?.data?.submissionStatus }) } catch {}
     handleSubmitToBackend(message, sendResponse);
     return true;
   }
@@ -243,7 +243,7 @@ chrome.runtime.onInstalled.addListener(() => {
 async function handleSubmitToBackend(message, sendResponse) {
   try {
     console.log('[background] handleSubmitToBackend: start');
-    const { data, token: tokenFromContent } = message;
+    const { data, token: tokenFromContent } = message || {};
     const token = tokenFromContent || authToken;
     if (!token) {
       console.warn('[background] handleSubmitToBackend: no token');
@@ -251,9 +251,32 @@ async function handleSubmitToBackend(message, sendResponse) {
       return;
     }
 
+    // Only process accepted submissions; content adapters should already filter
+    if (data?.submissionStatus && data.submissionStatus !== 'accepted') {
+      console.log('[background] handleSubmitToBackend: ignoring non-accepted submission', data?.submissionStatus);
+      sendResponse({ success: false, skipped: true, reason: 'non-accepted' });
+      return;
+    }
+
+    // Dedupe: avoid re-sending accepted code for the same problem
+    const keyParts = [data?.slug || 'unknown', data?.problemTitle || ''];
+    const dedupeKey = keyParts.join('::').toLowerCase();
+    try {
+      const stored = await chrome.storage.local.get(['acceptedIndex']);
+      const acceptedIndex = stored?.acceptedIndex || {};
+      if (acceptedIndex[dedupeKey]) {
+        console.log('[background] handleSubmitToBackend: duplicate accepted submission, skipping', dedupeKey);
+        sendResponse({ success: true, skipped: true, reason: 'duplicate' });
+        return;
+      }
+    } catch (e) {
+      console.warn('[background] handleSubmitToBackend: dedupe check failed (continuing)', e);
+    }
+
     const backendUrl = `${BACKEND_API_BASE}/submissions`;
     const maxRetries = 3;
     const baseDelay = 800;
+    const submittedAt = new Date().toISOString();
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -265,10 +288,14 @@ async function handleSubmitToBackend(message, sendResponse) {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
+            // Identifiers
             questionSlug: data.slug,
-            code: data.code,
-            language: data.language,
+            // Required storage fields
             problemTitle: data.problemTitle,
+            language: data.language,
+            code: data.code,
+            submittedAt,
+            // Optional legacy/status compat
             submissionStatus: data.submissionStatus || 'accepted'
           })
         });
@@ -294,8 +321,22 @@ async function handleSubmitToBackend(message, sendResponse) {
         await chrome.storage.local.set({
           syncStatus: 'Synced',
           problemsSynced,
-          lastSync: new Date().toISOString()
+          lastSync: submittedAt
         });
+
+        // Mark as accepted to prevent duplicates
+        try {
+          const prev = await chrome.storage.local.get(['acceptedIndex']);
+          const acceptedIndex = prev?.acceptedIndex || {};
+          acceptedIndex[dedupeKey] = {
+            submittedAt,
+            language: data.language,
+            problemTitle: data.problemTitle,
+          };
+          await chrome.storage.local.set({ acceptedIndex });
+        } catch (e) {
+          console.warn('[background] handleSubmitToBackend: failed to update dedupe index', e);
+        }
 
         sendResponse({ success: true, data: result?.data || result });
         return;
