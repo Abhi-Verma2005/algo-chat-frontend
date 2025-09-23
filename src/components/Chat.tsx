@@ -448,7 +448,7 @@ function Chat({
         <div className="flex flex-col justify-between items-center gap-4 h-full">
           <div
             ref={messagesContainerRef}
-            className="flex flex-col gap-4 h-full w-full items-center overflow-y-auto px-4 md:px-0 mt-4"
+            className="flex flex-col gap-4 h-full w-full overflow-y-auto px-4 md:px-0 mt-4"
           >
             {isLoadingChat || isSavingChat || isCreatingNewChat ? (
               <div className="flex items-center justify-center p-8">

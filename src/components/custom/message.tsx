@@ -248,7 +248,11 @@ export const Message = ({
 
   return (
     <motion.div
-      className={`flex flex-row gap-4 px-4 w-full md:w-[500px] md:px-0 first-of-type:pt-20`}
+      className={`flex px-4 w-full md:px-0 first-of-type:pt-20 ${
+        role === "assistant" 
+          ? "flex-row-reverse gap-4 justify-start" // AI messages: icon on right, content aligned right
+          : "flex-row gap-4 justify-start"         // User messages: icon on left, content aligned left
+      }`}
       initial={{ y: 5, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
     >
@@ -256,7 +260,11 @@ export const Message = ({
         {role === "assistant" ? <BotIcon /> : <UserIcon />}
       </div>
 
-      <div className="flex flex-col gap-2 w-full">
+      <div className={`flex flex-col gap-2 ${
+        role === "assistant" 
+          ? "max-w-[80%] md:max-w-[500px] items-end" // AI messages: right-aligned with max width
+          : "max-w-[80%] md:max-w-[500px] items-start" // User messages: left-aligned with max width
+      }`}>
         {/* Shimmer above AI message when streaming */}
         {role === "assistant" && isStreaming && (
           <div className="mb-2">
@@ -266,14 +274,20 @@ export const Message = ({
         
         {/* Main content */}
         {content && typeof content === "string" && (
-          <div className="text-zinc-800 dark:text-zinc-300 flex flex-col gap-4 text-base leading-relaxed">
+          <div className={`text-zinc-800 dark:text-zinc-300 flex flex-col gap-4 text-base leading-relaxed ${
+            role === "assistant" 
+              ? "bg-gray-100 dark:bg-gray-800 rounded-lg p-3 border" // AI messages: styled background
+              : "bg-blue-100 dark:bg-blue-900/30 rounded-lg p-3 border" // User messages: different colored background
+          }`}>
             <Markdown>{content}</Markdown>
           </div>
         )}
 
         {/* Tool invocations with proper result display */}
         {toolInvocations && (
-          <div className="flex flex-col gap-3">
+          <div className={`flex flex-col gap-3 ${
+            role === "assistant" ? "items-end" : "items-start"
+          }`}>
             {toolInvocations.map((toolInvocation) => {
               const { toolName, toolCallId, state } = toolInvocation;
               const result = (toolInvocation as any).result;
@@ -320,7 +334,9 @@ export const Message = ({
         )}
 
         {attachments && (
-          <div className="flex flex-row gap-2">
+          <div className={`flex flex-row gap-2 ${
+            role === "assistant" ? "justify-end" : "justify-start"
+          }`}>
             {attachments.map((attachment) => (
               <PreviewAttachment key={attachment.url} attachment={attachment} />
             ))}
