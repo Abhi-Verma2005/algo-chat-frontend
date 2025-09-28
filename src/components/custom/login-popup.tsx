@@ -1,70 +1,72 @@
-import React, { useState } from 'react';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { X } from 'lucide-react';
+import React, { useState } from 'react'
+import { Button } from '../ui/button'
+import { Input } from '../ui/input'
+import { Label } from '../ui/label'
+import { X } from 'lucide-react'
 
 interface LoginPopupProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onLoginSuccess: (userData: any, token: string) => void;
+  isOpen: boolean
+  onClose: () => void
+  onLoginSuccess: (userData: any, token: string) => void
 }
 
 export const LoginPopup: React.FC<LoginPopupProps> = ({
   isOpen,
   onClose,
-  onLoginSuccess
+  onLoginSuccess,
 }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
+    e.preventDefault()
+    setIsLoading(true)
+    setError('')
 
     try {
-      const API_BASE_URL = (import.meta as any).env?.VITE_BACKEND_API_BASE_URL || 'http://localhost:3001/api';
-      
+      const API_BASE_URL =
+        (import.meta as any).env?.VITE_BACKEND_API_BASE_URL ||
+        'http://localhost:3001/api'
+
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email, password }),
-      });
+      })
 
-      const data = await response.json();
+      const data = await response.json()
 
       if (response.ok && data.success) {
         // Store token in extension storage
         await chrome.storage.local.set({
           token: data.data.token,
           user: data.data.user,
-          timestamp: Date.now()
-        });
+          timestamp: Date.now(),
+        })
 
         // Call success callback
-        onLoginSuccess(data.data.user, data.data.token);
-        onClose();
-        
+        onLoginSuccess(data.data.user, data.data.token)
+        onClose()
+
         // Clear form
-        setEmail('');
-        setPassword('');
+        setEmail('')
+        setPassword('')
       } else {
-        setError(data.message || 'Login failed');
+        setError(data.message || 'Login failed')
       }
     } catch (error) {
-      console.error('Login error:', error);
-      setError('Network error. Please try again.');
+      console.error('Login error:', error)
+      setError('Network error. Please try again.')
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
-  if (!isOpen) return null;
+  if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -85,7 +87,10 @@ export const LoginPopup: React.FC<LoginPopupProps> = ({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <Label
+              htmlFor="email"
+              className="text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
               Email Address
             </Label>
             <Input
@@ -101,7 +106,10 @@ export const LoginPopup: React.FC<LoginPopupProps> = ({
           </div>
 
           <div>
-            <Label htmlFor="password" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <Label
+              htmlFor="password"
+              className="text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
               Password
             </Label>
             <Input
@@ -122,21 +130,25 @@ export const LoginPopup: React.FC<LoginPopupProps> = ({
             </div>
           )}
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={isLoading}
-          >
+          <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? 'Signing in...' : 'Sign In'}
           </Button>
         </form>
 
         <div className="mt-4 text-center">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Use your existing account credentials
+            If you dont have an account already{' '}
+            <u>
+              <a
+                href="https://algo-journey-3siz.vercel.app/auth/signin"
+                target="_blank"
+              >
+                signup
+              </a>
+            </u>
           </p>
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
